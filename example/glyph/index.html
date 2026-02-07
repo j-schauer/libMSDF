@@ -1,13 +1,14 @@
 <!DOCTYPE html>
 <!--
-  MSDF Shader Test Harness - WebGL2 / WebGPU
+  CRITICAL: This is the shader test harness. It visually verifies the MSDF shaders
+  are rendering correctly across WebGL2, raw WebGPU, and Pixi WebGPU. Do not remove.
 
   REQUIREMENTS:
-  - ../shaders.js (imports msdfVertGLSL, msdfFragGLSL, msdfWGSL)
+  - ../../src/shader.js (imports msdfVertGLSL, msdfFragGLSL, msdfWGSL)
   - ../assets/atlas.png (MSDF) or ../assets/atlas_mtsdf.png (MTSDF)
   - ../assets/atlas.json or ../assets/atlas_mtsdf.json
-  - Run via http-server: npx http-server . -p 8000 --cors
-  - Open: http://localhost:8000/demo/glyph/
+  - Run: lulu run example
+  - Open: http://localhost:8000/example/glyph/
 -->
 <html>
 <head>
@@ -126,7 +127,7 @@
     </div>
 
     <script type="module">
-        import { msdfVertGLSL, msdfFragGLSL, msdfWGSL } from '../../src/shaders.js';
+        import { msdfVertGLSL, msdfFragGLSL, msdfWGSL } from '../../src/shader.js';
         import * as PIXI from '../../lib/pixl/pixl.mjs';
 
         const logDiv = document.getElementById('log');

@@ -1,4 +1,2 @@
 #!/bin/bash
-# SIMPLE COMMANDS ONLY, ONLY 1 AT A TIME, DON'T DO THINGS OUTSIDE OF KITXXX OR FONTATLAS. CHANGE CONTENTS BEFORE EACH CALL.
-
-cp src/shaders.js dist/
+# Ad-hoc commands. MUST NOT edit/change anything outside this project.

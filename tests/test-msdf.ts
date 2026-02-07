@@ -1,5 +1,5 @@
 /**
- * kitMSDF Tests - Single glyph MSDF generation
+ * libMSDF Tests - Single glyph MSDF generation
  */
 
 import * as fs from 'fs';
@@ -29,11 +29,10 @@ async function runTest(name: string, fn: () => Promise<void> | void) {
 }
 
 async function main() {
-    console.log('\\n=== kitMSDF Test Suite ===\\n');
+    console.log('\n=== libMSDF Test Suite ===\n');
 
     // Load module
-    const { MSDFGenerator } = await import(path.join(__dirname, 'kitMSDF.js'));
-    const MSdfCoreFactory = (await import(path.join(__dirname, 'msdf-core.js'))).default;
+    const { initMSDF } = await import(path.join(__dirname, 'libMSDF.js'));
 
     // Load font
     const fontPath = path.join(__dirname, 'assets/Poppins-Regular.ttf');
@@ -43,12 +42,12 @@ async function main() {
     let msdf: any;
 
     console.log('Init Tests:');
-    await runTest('MSDFGenerator.init() loads WASM', async () => {
-        msdf = await MSDFGenerator.init(MSdfCoreFactory);
+    await runTest('initMSDF() loads WASM', async () => {
+        msdf = await initMSDF(path.join(__dirname, 'libMSDF.wasm'));
         assert(msdf !== null, 'msdf should not be null');
     });
 
-    console.log('\\nFont Tests:');
+    console.log('\nFont Tests:');
     await runTest('loadFont() accepts font data', async () => {
         msdf.loadFont(fontBytes);
     });
@@ -62,7 +61,7 @@ async function main() {
         assert(msdf.hasGlyph(0x1F600) === false, 'emoji should not exist');
     });
 
-    console.log('\\nGeneration Tests:');
+    console.log('\nGeneration Tests:');
     await runTest('generate() returns valid 3-channel MSDF', async () => {
         const glyph = msdf.generate(65, 64, 8);
         assert(glyph !== null, 'glyph should not be null');
@@ -85,7 +84,7 @@ async function main() {
     });
 
     // Variable font tests
-    console.log('\\nVariable Font Tests:');
+    console.log('\nVariable Font Tests:');
     const interPath = path.join(__dirname, 'assets/Inter-VariableFont_opsz,wght.ttf');
     if (fs.existsSync(interPath)) {
         const interBytes = new Uint8Array(fs.readFileSync(interPath));
@@ -104,7 +103,7 @@ async function main() {
     }
 
     // Summary
-    console.log('\\n=== Summary ===');
+    console.log('\n=== Summary ===');
     console.log(`Tests: ${passed} passed, ${failed} failed`);
     if (failed > 0) process.exit(1);
 }
