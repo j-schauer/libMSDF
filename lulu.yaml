@@ -12,13 +12,6 @@ deps:
     notes: "esbuild, typescript, dts-bundle-generator"
     update: npm install
 
-  freetype-wasm:
-    type: transient
-    path: lib/
-    export: []
-    notes: "Static libs for WASM build (libfreetype.a, libpng.a, libz.a, libbz2.a)"
-    source: "Emscripten ports - prebuilt for wasm32"
-
 build:
   _wasm:
     - |
