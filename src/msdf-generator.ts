@@ -1,3 +1,6 @@
+// @ts-ignore - Emscripten generated module, bundled by esbuild
+import LibMSDFFactory from '../build/libmsdf-core.js';
+
 export interface MSDFMetrics {
     width: number;
     height: number;
@@ -17,30 +20,26 @@ export interface MSDFGlyph {
     pixels: Float32Array; // RGB float data
 }
 
-// Emscripten Module Factory Type
-export type MSDFModuleFactory = (config?: any) => Promise<any>;
-
 export class MSDFGenerator {
     private module: any;
     private fontLoaded: boolean = false;
     private fontLen: number = 0;
 
-    constructor(wasmModule: any) {
+    private constructor(wasmModule: any) {
         this.module = wasmModule;
     }
 
     /**
      * Initialize the MSDF Generator.
-     * @param factory The Emscripten module factory function (default export from msdf-core.js)
-     * @param wasmBinary Optional raw WASM bytes (if you loaded msdf-core.wasm manually)
+     * @param wasmPath Path to the libMSDF.wasm file (URL in browser, file path in Node/Deno)
      */
-    static async init(factory: MSDFModuleFactory, wasmBinary?: ArrayBuffer): Promise<MSDFGenerator> {
-        const config: any = {};
-        if (wasmBinary) {
-            config.wasmBinary = wasmBinary;
-        }
-        
-        const mod = await factory(config);
+    static async init(wasmPath: string): Promise<MSDFGenerator> {
+        const mod = await LibMSDFFactory({
+            locateFile: (filename: string) => {
+                if (filename.endsWith('.wasm')) return wasmPath;
+                return filename;
+            }
+        });
         return new MSDFGenerator(mod);
     }
 
@@ -325,4 +324,9 @@ export class MSDFGenerator {
         this.module._free_buffers();
         this.fontLoaded = false;
     }
+}
+
+/** Convenience wrapper for MSDFGenerator.init() */
+export async function initMSDF(wasmPath: string): Promise<MSDFGenerator> {
+    return MSDFGenerator.init(wasmPath);
 }
