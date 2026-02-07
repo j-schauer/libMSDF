@@ -25,7 +25,6 @@ build:
     - |
       mkdir -p build
       make -f Makefile.wasm
-      cp dist/msdf-core.js dist/msdf-core.wasm build/
 
   _types:
     - npx dts-bundle-generator -o build/kitMSDF.d.ts src/index.ts --no-check 2>/dev/null || echo "Types generation skipped"
@@ -35,45 +34,33 @@ build:
       @deps
       @build._wasm
       @build._types
-      mkdir -p ${TARGET}
-      # Main module
+      mkdir -p dist
       npx esbuild src/index.ts --bundle --format=esm --platform=neutral --target=es2020 \
-        --outfile=${TARGET}/kitMSDF.js
-      # Node worker
+        --outfile=dist/kitMSDF.js
       npx esbuild src/worker.ts --bundle --format=esm --platform=node --target=es2020 \
-        --outfile=${TARGET}/worker.js \
+        --outfile=dist/worker.js \
         --external:worker_threads
-      # Browser worker
       npx esbuild src/worker-browser.ts --bundle --format=esm --platform=browser --target=es2020 \
-        --outfile=${TARGET}/worker-browser.js
-      # Deno worker
+        --outfile=dist/worker-browser.js
       npx esbuild src/worker-deno.ts --bundle --format=esm --platform=browser --target=es2020 \
-        --outfile=${TARGET}/worker-deno.js
-      # WASM files
-      cp build/msdf-core.js build/msdf-core.wasm ${TARGET}/
-      # Types (optional)
-      cp build/kitMSDF.d.ts ${TARGET}/ 2>/dev/null || true
-      # Shaders
-      cp src/shaders.js ${TARGET}/
-      # Docs
-      cp docs/api.md ${TARGET}/
-
-  test:
-    - |
-      @deps
-      @build._wasm
-      mkdir -p ${TARGET}/assets
-      npx esbuild src/index.ts --bundle --format=esm --platform=node --target=es2020 \
-        --outfile=${TARGET}/kitMSDF.js
-      cp build/msdf-core.js build/msdf-core.wasm ${TARGET}/
-      cp assets/*.ttf ${TARGET}/assets/
-      npx tsc tests/test-msdf.ts --target esnext --module esnext --moduleResolution node --outDir ${TARGET} --skipLibCheck
+        --outfile=dist/worker-deno.js
+      cp build/msdf-core.js build/msdf-core.wasm dist/
+      cp build/kitMSDF.d.ts dist/ 2>/dev/null || true
+      cp src/shaders.js dist/
+      cp docs/api.md dist/
 
 run:
   test:
     - |
-      @build test
-      cd ${TARGET} && node test-msdf.js
+      @deps
+      @build._wasm
+      mkdir -p dist/assets
+      npx esbuild src/index.ts --bundle --format=esm --platform=node --target=es2020 \
+        --outfile=dist/kitMSDF.js
+      cp build/msdf-core.js build/msdf-core.wasm dist/
+      cp assets/*.ttf dist/assets/
+      npx tsc tests/test-msdf.ts --target esnext --module esnext --moduleResolution node --outDir dist --skipLibCheck
+      cd dist && node test-msdf.js
 
   example:
     - |

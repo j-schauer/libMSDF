@@ -1,7 +1,7 @@
 # Makefile for MSDF "Minimal Core" WASM Build
 # Builds a single-threaded WASM module that generates one glyph at a time.
 
-BUILD_DIR = dist
+BUILD_DIR = build
 SRC_DIR = src
 MSDFGEN_DIR = msdf-atlas-gen/msdfgen
 
