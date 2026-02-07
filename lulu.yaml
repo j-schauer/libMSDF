@@ -12,6 +12,14 @@ deps:
     notes: "esbuild, typescript, dts-bundle-generator"
     update: npm install
 
+  pixl:
+    type: transient-depot
+    source: "github:j-schauer/pixl"
+    path: lib/pixl/
+    export: []
+    notes: "PixiJS for example/glyph shader demo"
+    update: lulu depot github j-schauer/pixl 'pixl-*.zip' lib/pixl/ --latest
+
 build:
   _wasm:
     - |
@@ -20,7 +28,7 @@ build:
       cp dist/msdf-core.js dist/msdf-core.wasm build/
 
   _types:
-    - npx dts-bundle-generator -o build/kitMSDF.d.ts src/index.ts --no-check
+    - npx dts-bundle-generator -o build/kitMSDF.d.ts src/index.ts --no-check 2>/dev/null || echo "Types generation skipped"
 
   release:
     - |
@@ -43,8 +51,10 @@ build:
         --outfile=${TARGET}/worker-deno.js
       # WASM files
       cp build/msdf-core.js build/msdf-core.wasm ${TARGET}/
-      # Types
-      cp build/kitMSDF.d.ts ${TARGET}/
+      # Types (optional)
+      cp build/kitMSDF.d.ts ${TARGET}/ 2>/dev/null || true
+      # Shaders
+      cp src/shaders.js ${TARGET}/
       # Docs
       cp docs/api.md ${TARGET}/
 
@@ -64,6 +74,12 @@ run:
     - |
       @build test
       cd ${TARGET} && node test-msdf.js
+
+  example:
+    - |
+      @deps
+      echo "Open http://localhost:8000/example/glyph/"
+      npx http-server . -p 8000 --cors -c-1
 
 clean:
   - rm -rf build dist node_modules

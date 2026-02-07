@@ -1,7 +1,9 @@
 node_modules/
 dist/
 build/
+lib/
 *.js
 *.d.ts
 !go.sh
+!src/shaders.js
 .DS_Store
