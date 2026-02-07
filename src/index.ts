@@ -1,0 +1,9 @@
+/**
+ * kitMSDF - Single glyph MSDF generation via WASM
+ *
+ * This module provides low-level MSDF glyph generation.
+ * For atlas management and caching, see kitAtlas.
+ */
+
+export { MSDFGenerator, MSDFGlyph, MSDFMetrics } from './msdf-generator.js';
+export type { VariationAxis } from './msdf-generator.js';

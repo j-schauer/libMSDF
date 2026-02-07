@@ -1,0 +1,65 @@
+# Makefile for MSDF "Minimal Core" WASM Build
+# Builds a single-threaded WASM module that generates one glyph at a time.
+
+BUILD_DIR = dist
+SRC_DIR = src
+MSDFGEN_DIR = msdf-atlas-gen/msdfgen
+
+CXX = em++
+
+# Sources: The Core Wrapper + Core MSDFGEN library
+SOURCES = \
+        $(SRC_DIR)/wasm/wasm_binding.cpp \
+        $(MSDFGEN_DIR)/core/Contour.cpp \
+        $(MSDFGEN_DIR)/core/contour-combiners.cpp \
+        $(MSDFGEN_DIR)/core/DistanceMapping.cpp \
+        $(MSDFGEN_DIR)/core/EdgeHolder.cpp \
+        $(MSDFGEN_DIR)/core/edge-coloring.cpp \
+        $(MSDFGEN_DIR)/core/edge-segments.cpp \
+        $(MSDFGEN_DIR)/core/edge-selectors.cpp \
+        $(MSDFGEN_DIR)/core/equation-solver.cpp \
+        $(MSDFGEN_DIR)/core/MSDFErrorCorrection.cpp \
+        $(MSDFGEN_DIR)/core/msdf-error-correction.cpp \
+        $(MSDFGEN_DIR)/core/msdfgen.cpp \
+        $(MSDFGEN_DIR)/core/Projection.cpp \
+        $(MSDFGEN_DIR)/core/rasterization.cpp \
+        $(MSDFGEN_DIR)/core/render-sdf.cpp \
+        $(MSDFGEN_DIR)/core/save-bmp.cpp \
+        $(MSDFGEN_DIR)/core/save-fl32.cpp \
+        $(MSDFGEN_DIR)/core/save-rgba.cpp \
+        $(MSDFGEN_DIR)/core/save-tiff.cpp \
+        $(MSDFGEN_DIR)/core/Scanline.cpp \
+        $(MSDFGEN_DIR)/core/sdf-error-estimation.cpp \
+        $(MSDFGEN_DIR)/core/Shape.cpp \
+        $(MSDFGEN_DIR)/core/shape-description.cpp \
+        $(MSDFGEN_DIR)/ext/import-font.cpp \
+        $(MSDFGEN_DIR)/ext/import-svg.cpp \
+        $(MSDFGEN_DIR)/ext/resolve-shape-geometry.cpp
+
+# Output
+WASM_OUTPUT = $(BUILD_DIR)/msdf-core.js
+
+all: wasm_build
+
+wasm_build:
+	@mkdir -p $(BUILD_DIR)
+	@echo "🚀 Building Minimal MSDF Core (WASM)..."
+	$(CXX) -std=c++17 -O3 -DNDEBUG -DMSDFGEN_PUBLIC= -DMSDFGEN_USE_CPP11 \
+		-sMODULARIZE=1 \
+		-sEXPORT_NAME="MSdfCoreFactory" \
+		-sEXPORT_ES6=1 \
+		-sENVIRONMENT=web,node \
+		-sALLOW_MEMORY_GROWTH=1 \
+		-sEXPORTED_FUNCTIONS="['_malloc','_free','_generate_glyph','_generate_mtsdf_glyph','_generate_glyph_var','_generate_mtsdf_glyph_var','_prepare_font_buffer','_free_buffers','_clear_variation_axes','_add_variation_axis','_has_glyph']" \
+		-sEXPORTED_RUNTIME_METHODS="['ccall','cwrap','HEAPF32','HEAPU8']" \
+		-sUSE_FREETYPE=1 \
+		-I$(MSDFGEN_DIR) \
+		-I$(MSDFGEN_DIR)/core \
+		-I$(MSDFGEN_DIR)/ext \
+		-I$(SRC_DIR)/wasm \
+		$(SOURCES) \
+		-o $(WASM_OUTPUT)
+	@echo "✅ Build complete: $(WASM_OUTPUT)"
+
+clean:
+	rm -rf $(BUILD_DIR)

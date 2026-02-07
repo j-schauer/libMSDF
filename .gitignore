@@ -1,0 +1,7 @@
+node_modules/
+dist/
+build/
+*.js
+*.d.ts
+!go.sh
+.DS_Store

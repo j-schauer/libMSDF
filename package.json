@@ -1,0 +1,11 @@
+{
+  "name": "kitmsdf",
+  "private": true,
+  "type": "module",
+  "devDependencies": {
+    "@types/node": "^25.2.1",
+    "dts-bundle-generator": "^9.5.0",
+    "esbuild": "^0.25.0",
+    "typescript": "^5.7.0"
+  }
+}

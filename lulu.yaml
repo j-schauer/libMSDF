@@ -1,0 +1,76 @@
+version: 0.1.0
+name: kitMSDF
+
+# Single glyph MSDF generation via WASM
+# Publishes compiled JS + WASM artifacts
+
+deps:
+  node-modules:
+    type: transient
+    path: node_modules/
+    export: []
+    notes: "esbuild, typescript, dts-bundle-generator"
+    update: npm install
+
+  freetype-wasm:
+    type: transient
+    path: lib/
+    export: []
+    notes: "Static libs for WASM build (libfreetype.a, libpng.a, libz.a, libbz2.a)"
+    source: "Emscripten ports - prebuilt for wasm32"
+
+build:
+  _wasm:
+    - |
+      mkdir -p build
+      make -f Makefile.wasm
+      cp dist/msdf-core.js dist/msdf-core.wasm build/
+
+  _types:
+    - npx dts-bundle-generator -o build/kitMSDF.d.ts src/index.ts --no-check
+
+  release:
+    - |
+      @deps
+      @build._wasm
+      @build._types
+      mkdir -p ${TARGET}
+      # Main module
+      npx esbuild src/index.ts --bundle --format=esm --platform=neutral --target=es2020 \
+        --outfile=${TARGET}/kitMSDF.js
+      # Node worker
+      npx esbuild src/worker.ts --bundle --format=esm --platform=node --target=es2020 \
+        --outfile=${TARGET}/worker.js \
+        --external:worker_threads
+      # Browser worker
+      npx esbuild src/worker-browser.ts --bundle --format=esm --platform=browser --target=es2020 \
+        --outfile=${TARGET}/worker-browser.js
+      # Deno worker
+      npx esbuild src/worker-deno.ts --bundle --format=esm --platform=browser --target=es2020 \
+        --outfile=${TARGET}/worker-deno.js
+      # WASM files
+      cp build/msdf-core.js build/msdf-core.wasm ${TARGET}/
+      # Types
+      cp build/kitMSDF.d.ts ${TARGET}/
+      # Docs
+      cp docs/api.md ${TARGET}/
+
+  test:
+    - |
+      @deps
+      @build._wasm
+      mkdir -p ${TARGET}/assets
+      npx esbuild src/index.ts --bundle --format=esm --platform=node --target=es2020 \
+        --outfile=${TARGET}/kitMSDF.js
+      cp build/msdf-core.js build/msdf-core.wasm ${TARGET}/
+      cp assets/*.ttf ${TARGET}/assets/
+      npx tsc tests/test-msdf.ts --target esnext --module esnext --moduleResolution node --outDir ${TARGET} --skipLibCheck
+
+run:
+  test:
+    - |
+      @build test
+      cd ${TARGET} && node test-msdf.js
+
+clean:
+  - rm -rf build dist node_modules
