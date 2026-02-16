@@ -22,7 +22,7 @@ Our C++ binding layer (`src/wasm/core.h`, `src/wasm/wasm_binding.cpp`) provides 
 
 The library takes a TTF or OTF font file as raw bytes and generates MSDF/MTSDF bitmaps for individual Unicode codepoints. The main calls:
 
-- `initMSDF(wasmPath)` -- async, loads the WASM module
+- `MSDFGenerator.init(modulePath)` -- async, loads the WASM module
 - `loadFont(fontBytes)` -- load a TTF/OTF file into WASM memory
 - `hasGlyph(charCode)` -- check if a codepoint exists in the font
 - `generate(charCode, fontSize, pixelRange)` -- produce a 3-channel MSDF bitmap

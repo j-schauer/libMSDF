@@ -31,12 +31,12 @@ export class MSDFGenerator {
 
     /**
      * Initialize the MSDF Generator.
-     * @param wasmPath Path to the libMSDF.wasm file (URL in browser, file path in Node/Deno)
+     * @param modulePath Path to the libMSDF.wasm file (URL in browser, file path in Node/Deno)
      */
-    static async init(wasmPath: string): Promise<MSDFGenerator> {
+    static async init(modulePath: string): Promise<MSDFGenerator> {
         const mod = await LibMSDFFactory({
             locateFile: (filename: string) => {
-                if (filename.endsWith('.wasm')) return wasmPath;
+                if (filename.endsWith('.wasm')) return modulePath;
                 return filename;
             }
         });
@@ -324,9 +324,4 @@ export class MSDFGenerator {
         this.module._free_buffers();
         this.fontLoaded = false;
     }
-}
-
-/** Convenience wrapper for MSDFGenerator.init() */
-export async function initMSDF(wasmPath: string): Promise<MSDFGenerator> {
-    return MSDFGenerator.init(wasmPath);
 }

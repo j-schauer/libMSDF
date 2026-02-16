@@ -5,9 +5,9 @@ Single-glyph MSDF generation via WASM. Generates MSDF (3-channel) or MTSDF (4-ch
 ## Quick Start
 
 ```typescript
-import { initMSDF } from './libMSDF.js';
+import { MSDFGenerator } from './libMSDF.js';
 
-const msdf = await initMSDF('./libMSDF.wasm');
+const msdf = await MSDFGenerator.init('./libMSDF.wasm');
 
 // Load a font (raw TTF/OTF bytes)
 const fontBytes = new Uint8Array(fs.readFileSync('MyFont.ttf'));
@@ -24,26 +24,26 @@ console.log(glyph.pixels.length); // 52 * 55 * 4 = 11440
 
 ## Initialization
 
-### initMSDF(wasmPath)
+### MSDFGenerator.init(modulePath)
 
 ```typescript
-async function initMSDF(wasmPath: string): Promise<MSDFGenerator>
+static async init(modulePath: string): Promise<MSDFGenerator>
 ```
 
 Loads the WASM module and returns a ready `MSDFGenerator`. Call once at startup.
 
-- **wasmPath**: Path to `libMSDF.wasm`. In browser, this is a URL relative to the page. In Node/Deno, a file system path. Emscripten handles the platform-specific loading internally.
+- **modulePath**: Path to `libMSDF.wasm`. In browser, this is a URL relative to the page or an absolute URL. In Node/Deno, a file system path (relative or absolute). Emscripten handles platform-specific loading internally (fetch in browser, fs.readFile in Node).
 
 ```typescript
 // Browser
-const msdf = await initMSDF('/assets/libMSDF.wasm');
+const msdf = await MSDFGenerator.init('/assets/libMSDF.wasm');
 
 // Node.js
-const msdf = await initMSDF('./dist/libMSDF.wasm');
+const msdf = await MSDFGenerator.init('./dist/libMSDF.wasm');
 
 // Node.js with absolute path
 import path from 'path';
-const msdf = await initMSDF(path.join(__dirname, 'libMSDF.wasm'));
+const msdf = await MSDFGenerator.init(path.join(__dirname, 'libMSDF.wasm'));
 ```
 
 ## Font Loading

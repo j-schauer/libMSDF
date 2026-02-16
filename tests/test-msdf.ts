@@ -32,7 +32,7 @@ async function main() {
     console.log('\n=== libMSDF Test Suite ===\n');
 
     // Load module
-    const { initMSDF } = await import(path.join(__dirname, 'libMSDF.js'));
+    const { MSDFGenerator } = await import(path.join(__dirname, 'libMSDF.js'));
 
     // Load font
     const fontPath = path.join(__dirname, 'assets/Poppins-Regular.ttf');
@@ -42,8 +42,8 @@ async function main() {
     let msdf: any;
 
     console.log('Init Tests:');
-    await runTest('initMSDF() loads WASM', async () => {
-        msdf = await initMSDF(path.join(__dirname, 'libMSDF.wasm'));
+    await runTest('MSDFGenerator.init() loads WASM', async () => {
+        msdf = await MSDFGenerator.init(path.join(__dirname, 'libMSDF.wasm'));
         assert(msdf !== null, 'msdf should not be null');
     });
 
