@@ -1,5 +1,20 @@
 <!DOCTYPE html>
 <!--
+  TODO: Fix pixi app init - missing DPI/resolution settings.
+  Correct pixi init (from himax/src/himax/App.ts):
+
+    await app.init({
+        preference: 'webgpu',
+        backgroundColor: 0x000000,
+        autoDensity: true,
+        resolution: 2,
+        powerPreference: 'high-performance',
+        antialias: true
+    });
+
+  Currently missing: autoDensity, resolution, powerPreference, antialias.
+-->
+<!--
   CRITICAL: This is the shader test harness. It visually verifies the MSDF shaders
   are rendering correctly across WebGL2, raw WebGPU, and Pixi WebGPU. Do not remove.
 
