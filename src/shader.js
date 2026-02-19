@@ -22,12 +22,14 @@
 export const msdfVertGLSL = `#version 300 es
 in vec2 aPosition;
 in vec2 aUV;
+in vec4 aColor;
 
 // Pixi-provided transform matrices (bind identity for standalone)
 uniform mat3 uProjectionMatrix;
 uniform mat3 uWorldTransformMatrix;
 
 out vec2 vTexcoord;
+out vec4 vColor;
 
 void main() {
     // Combine Pixi's projection and world transforms
@@ -35,6 +37,7 @@ void main() {
     vec3 clip = mvp * vec3(aPosition, 1.0);
     gl_Position = vec4(clip.xy, 0.0, 1.0);
     vTexcoord = aUV;
+    vColor = aColor;
 }
 `;
 
@@ -47,6 +50,7 @@ export const msdfFragGLSL = `#version 300 es
 precision mediump float;
 
 in vec2 vTexcoord;
+in vec4 vColor;
 out vec4 outColor;
 
 uniform sampler2D uTexture;
@@ -55,7 +59,6 @@ uniform int uDebugMode;
 uniform vec4 uDebugColor;
 uniform vec4 uViewport;
 
-uniform vec4 uColor;
 uniform float uSmoothing;
 uniform float uWeight;
 uniform float uUseAlpha;
@@ -141,8 +144,8 @@ void main() {
     float aIn = 0.5 + 0.5 * smoothstep(0.0, wIn, screenDist);
     float baseAlpha = mix(aOut, aIn, step(0.0, screenDist));
 
-    float outA = baseAlpha * uColor.a;
-    vec3 outRGB = uColor.rgb * outA;
+    float outA = baseAlpha * vColor.a;
+    vec3 outRGB = vColor.rgb * outA;
     vec4 glyphPM = vec4(outRGB, outA);
 
     if (uFancyEnable < 0.5) {
@@ -160,8 +163,8 @@ void main() {
     if (uBlurOnOff > 0.5 && uCharBlur > 0.0) {
         float blurPx = uCharBlur * 3.0;
         baseAlpha = smoothstep(-blurPx, blurPx, screenDist);
-        outA = baseAlpha * uColor.a;
-        outRGB = uColor.rgb * outA;
+        outA = baseAlpha * vColor.a;
+        outRGB = vColor.rgb * outA;
         glyphPM = vec4(outRGB, outA);
     }
 
@@ -227,7 +230,6 @@ struct GlobalUniforms {
 
 // Custom uniforms - @group(1), provided via resources
 struct Uniforms {
-    uColor: vec4f,
     uDebugColor: vec4f,
     uViewport: vec4f,
     uOutlineColor: vec4f,
@@ -259,6 +261,7 @@ struct Uniforms {
 struct VertexOutput {
     @builtin(position) position: vec4f,
     @location(0) vTexcoord: vec2f,
+    @location(1) vColor: vec4f,
 }
 
 // IMPORTANT: Inline @location with trailing comma (Pixi parser bug #11819 workaround)
@@ -266,6 +269,7 @@ struct VertexOutput {
 fn vs_main(
     @location(0) aPosition: vec2f,
     @location(1) aUV: vec2f,
+    @location(2) aColor: vec4f,
 ) -> VertexOutput {
     var out: VertexOutput;
 
@@ -274,6 +278,7 @@ fn vs_main(
     let clip = mvp * vec3f(aPosition, 1.0);
     out.position = vec4f(clip.xy, 0.0, 1.0);
     out.vTexcoord = aUV;
+    out.vColor = aColor;
 
     return out;
 }
@@ -347,8 +352,8 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4f {
     var baseAlpha = mix(aOut, aIn, step(0.0, screenDist));
 
     // Premultiplied alpha output
-    var outA = baseAlpha * u.uColor.a;
-    var outRGB = u.uColor.rgb * outA;
+    var outA = baseAlpha * in.vColor.a;
+    var outRGB = in.vColor.rgb * outA;
     var glyphPM = vec4f(outRGB, outA);
 
     // Fast path: no fancy effects
@@ -370,8 +375,8 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4f {
     if (u.uBlurOnOff > 0.5 && u.uCharBlur > 0.0) {
         let blurPx = u.uCharBlur * 3.0;
         baseAlpha = smoothstep(-blurPx, blurPx, screenDist);
-        outA = baseAlpha * u.uColor.a;
-        outRGB = u.uColor.rgb * outA;
+        outA = baseAlpha * in.vColor.a;
+        outRGB = in.vColor.rgb * outA;
         glyphPM = vec4f(outRGB, outA);
     }
 

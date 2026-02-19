@@ -209,6 +209,19 @@
                 gl.bufferData(gl.ARRAY_BUFFER, borderPositions, gl.STATIC_DRAW);
 
                 this.uvBuf = gl.createBuffer();
+
+                // Per-vertex color buffer (distinct corners to visualize interpolation)
+                // Vertex order: BL, BR, TL, TR (triangle strip)
+                const colors = new Float32Array([
+                    1,0,0,1,  // BL = red
+                    0,1,0,1,  // BR = green
+                    0,0,1,1,  // TL = blue
+                    1,1,0,1,  // TR = yellow
+                ]);
+                this.colorBuf = gl.createBuffer();
+                gl.bindBuffer(gl.ARRAY_BUFFER, this.colorBuf);
+                gl.bufferData(gl.ARRAY_BUFFER, colors, gl.STATIC_DRAW);
+
                 log('WebGL2 initialized');
             }
 
@@ -255,6 +268,11 @@
                 gl.enableVertexAttribArray(aUV);
                 gl.vertexAttribPointer(aUV, 2, gl.FLOAT, false, 0, 0);
 
+                const aColor = gl.getAttribLocation(this.program, 'aColor');
+                gl.bindBuffer(gl.ARRAY_BUFFER, this.colorBuf);
+                gl.enableVertexAttribArray(aColor);
+                gl.vertexAttribPointer(aColor, 4, gl.FLOAT, false, 0, 0);
+
                 gl.activeTexture(gl.TEXTURE0);
                 gl.bindTexture(gl.TEXTURE_2D, this.textures[currentAtlas]);
 
@@ -263,7 +281,6 @@
                 gl.uniformMatrix3fv(gl.getUniformLocation(this.program, 'uProjectionMatrix'), false, identity);
                 gl.uniformMatrix3fv(gl.getUniformLocation(this.program, 'uWorldTransformMatrix'), false, identity);
 
-                gl.uniform4f(gl.getUniformLocation(this.program, 'uColor'), 1, 1, 1, 1);
                 gl.uniform1f(gl.getUniformLocation(this.program, 'uSmoothing'), state.smoothing);
                 gl.uniform1f(gl.getUniformLocation(this.program, 'uWeight'), state.weight);
                 gl.uniform1f(gl.getUniformLocation(this.program, 'uUseAlpha'), state.useAlpha);
@@ -394,6 +411,21 @@
                 });
                 this.device.queue.writeBuffer(this.vertexBuffer, 0, positions);
 
+                // Per-vertex color buffer (6 verts, triangle-list: BL, BR, TL, TL, BR, TR)
+                const colors = new Float32Array([
+                    1,0,0,1,  // BL = red
+                    0,1,0,1,  // BR = green
+                    0,0,1,1,  // TL = blue
+                    0,0,1,1,  // TL = blue
+                    0,1,0,1,  // BR = green
+                    1,1,0,1,  // TR = yellow
+                ]);
+                this.colorBuffer = this.device.createBuffer({
+                    size: colors.byteLength,
+                    usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
+                });
+                this.device.queue.writeBuffer(this.colorBuffer, 0, colors);
+
                 // Bind group layout for @group(0) - GlobalUniforms
                 const globalBindGroupLayout = this.device.createBindGroupLayout({
                     entries: [
@@ -421,7 +453,8 @@
                         entryPoint: 'vs_main',
                         buffers: [
                             { arrayStride: 8, attributes: [{ shaderLocation: 0, offset: 0, format: 'float32x2' }] },
-                            { arrayStride: 8, attributes: [{ shaderLocation: 1, offset: 0, format: 'float32x2' }] }
+                            { arrayStride: 8, attributes: [{ shaderLocation: 1, offset: 0, format: 'float32x2' }] },
+                            { arrayStride: 16, attributes: [{ shaderLocation: 2, offset: 0, format: 'float32x4' }] }
                         ]
                     },
                     fragment: {
@@ -502,28 +535,28 @@
                 const i32 = new Int32Array(uniforms);
 
                 // Pack uniforms to match WGSL Uniforms struct (@group(1))
-                f32[0] = 1; f32[1] = 1; f32[2] = 1; f32[3] = 1;  // color
-                f32[4] = 1; f32[5] = 0; f32[6] = 1; f32[7] = 1;  // debugColor
-                f32[8] = cx; f32[9] = cy; f32[10] = state.size; f32[11] = state.size;  // viewport
-                f32[12] = state.outlineColor[0]; f32[13] = state.outlineColor[1]; f32[14] = state.outlineColor[2]; f32[15] = state.outlineColor[3];  // outlineColor
-                f32[16] = state.glowColor[0]; f32[17] = state.glowColor[1]; f32[18] = state.glowColor[2]; f32[19] = state.glowColor[3];  // glowColor
-                f32[20] = state.glowOffsetX; f32[21] = state.glowOffsetY;  // glowOffset
-                f32[22] = json.common.scaleW; f32[23] = json.common.scaleH;  // texSize
-                f32[24] = state.smoothing;
-                f32[25] = state.weight;
-                f32[26] = state.useAlpha;
-                f32[27] = 8.0;  // pxRange
-                f32[28] = state.fancyEnable;
-                f32[29] = state.showMedian;
-                f32[30] = state.outlineOn;
-                f32[31] = state.outlineWidth;
-                f32[32] = state.glowOn;
-                f32[33] = state.glowRadius;
-                f32[34] = state.glowAlpha;
-                f32[35] = state.glowDiffusion;
-                f32[36] = state.blurOn;
-                f32[37] = state.charBlur;
-                i32[38] = state.debugMode;
+                // uColor removed - now a per-vertex attribute
+                f32[0] = 1; f32[1] = 0; f32[2] = 1; f32[3] = 1;  // debugColor
+                f32[4] = cx; f32[5] = cy; f32[6] = state.size; f32[7] = state.size;  // viewport
+                f32[8] = state.outlineColor[0]; f32[9] = state.outlineColor[1]; f32[10] = state.outlineColor[2]; f32[11] = state.outlineColor[3];  // outlineColor
+                f32[12] = state.glowColor[0]; f32[13] = state.glowColor[1]; f32[14] = state.glowColor[2]; f32[15] = state.glowColor[3];  // glowColor
+                f32[16] = state.glowOffsetX; f32[17] = state.glowOffsetY;  // glowOffset
+                f32[18] = json.common.scaleW; f32[19] = json.common.scaleH;  // texSize
+                f32[20] = state.smoothing;
+                f32[21] = state.weight;
+                f32[22] = state.useAlpha;
+                f32[23] = 8.0;  // pxRange
+                f32[24] = state.fancyEnable;
+                f32[25] = state.showMedian;
+                f32[26] = state.outlineOn;
+                f32[27] = state.outlineWidth;
+                f32[28] = state.glowOn;
+                f32[29] = state.glowRadius;
+                f32[30] = state.glowAlpha;
+                f32[31] = state.glowDiffusion;
+                f32[32] = state.blurOn;
+                f32[33] = state.charBlur;
+                i32[34] = state.debugMode;
 
                 this.device.queue.writeBuffer(this.uniformBuffer, 0, uniforms);
 
@@ -544,6 +577,7 @@
                 renderPass.setBindGroup(1, this.customBindGroups[currentAtlas]);  // @group(1) - Custom
                 renderPass.setVertexBuffer(0, this.vertexBuffer);
                 renderPass.setVertexBuffer(1, this.uvBuffers[currentAtlas]);
+                renderPass.setVertexBuffer(2, this.colorBuffer);
                 renderPass.setViewport(cx, cy, state.size, state.size, 0, 1);
                 renderPass.draw(6);
                 renderPass.end();
@@ -635,44 +669,26 @@
 
                 const indices = new Uint32Array([0, 1, 2, 0, 2, 3]);
 
-                this.geometry = new PIXI.MeshGeometry({
-                    positions,
-                    uvs,
-                    indices
+                // Per-vertex colors (TL, TR, BR, BL vertex order)
+                const colors = new Float32Array([
+                    0,0,1,1,  // TL = blue
+                    1,1,0,1,  // TR = yellow
+                    0,1,0,1,  // BR = green
+                    1,0,0,1,  // BL = red
+                ]);
+
+                this.geometry = new PIXI.Geometry({
+                    attributes: {
+                        aPosition: { buffer: new Float32Array(positions), size: 2 },
+                        aUV: { buffer: new Float32Array(uvs), size: 2 },
+                        aColor: { buffer: colors, size: 4 },
+                    },
+                    indexBuffer: indices
                 });
 
-                // Create uniforms group
+                // Uniforms must match the struct order in msdfWGSL (uColor removed)
                 const json = jsons[currentAtlas];
                 this.uniforms = new PIXI.UniformGroup({
-                    uColor: { value: [1.0, 1.0, 1.0, 1.0], type: 'vec4<f32>' },
-                    uDebugColor: { value: [1.0, 0.0, 1.0, 1.0], type: 'vec4<f32>' },
-                    uViewport: { value: [cx, cy, size, size], type: 'vec4<f32>' },
-                    uOutlineColor: { value: state.outlineColor, type: 'vec4<f32>' },
-                    uGlowColor: { value: state.glowColor, type: 'vec4<f32>' },
-                    uGlowOffset: { value: [state.glowOffsetX, state.glowOffsetY], type: 'vec2<f32>' },
-                    uTexSize: { value: [json.common.scaleW, json.common.scaleH], type: 'vec2<f32>' },
-                    uSmoothing: { value: state.smoothing, type: 'f32' },
-                    uWeight: { value: state.weight, type: 'f32' },
-                    uUseAlpha: { value: state.useAlpha, type: 'f32' },
-                    uPxRange: { value: 8.0, type: 'f32' },
-                    uFancyEnable: { value: state.fancyEnable, type: 'f32' },
-                    uShowMedian: { value: state.showMedian, type: 'f32' },
-                    uOutlineOnOff: { value: state.outlineOn, type: 'f32' },
-                    uOutlineWidth: { value: state.outlineWidth, type: 'f32' },
-                    uGlowOnOff: { value: state.glowOn, type: 'f32' },
-                    uGlowRadius: { value: state.glowRadius, type: 'f32' },
-                    uGlowAlpha: { value: state.glowAlpha, type: 'f32' },
-                    uGlowDiffusion: { value: state.glowDiffusion, type: 'f32' },
-                    uBlurOnOff: { value: state.blurOn, type: 'f32' },
-                    uCharBlur: { value: state.charBlur, type: 'f32' },
-                    uDebugMode: { value: state.debugMode, type: 'i32' },
-                    _pad: { value: [0, 0], type: 'vec2<f32>' },  // Must match WGSL struct padding
-                });
-
-                // Use the exported MSDF shader from shaders.js (msdfWGSL)
-                // Uniforms must match the struct order in msdfWGSL
-                this.uniforms = new PIXI.UniformGroup({
-                    uColor: { value: [1.0, 1.0, 1.0, 1.0], type: 'vec4<f32>' },
                     uDebugColor: { value: [1.0, 0.0, 1.0, 1.0], type: 'vec4<f32>' },
                     uViewport: { value: [cx, cy, size, size], type: 'vec4<f32>' },
                     uOutlineColor: { value: state.outlineColor, type: 'vec4<f32>' },
