@@ -684,6 +684,7 @@
 
             async loadTexture(type, img) {
                 const texture = PIXI.Texture.from(img);
+                texture.source.alphaMode = 'no-premultiply-alpha'; // MTSDF needs raw alpha — Pixi defaults to premultiply which corrupts RGB distance values
                 this.textures[type] = texture;
                 log(`Pixi texture loaded: ${type} (${img.width}x${img.height})`);
             }

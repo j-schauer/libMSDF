@@ -32,6 +32,13 @@
  *   WebGPU: @group(0) GlobalUniforms, @group(1) LocalUniforms (per-mesh transform),
  *           @group(2) custom uniforms + texture + sampler
  *
+ * PIXI MTSDF TEXTURE NOTE:
+ *   Pixi defaults to premultiply-alpha-on-upload, which corrupts MTSDF atlas data.
+ *   MTSDF stores SDF distance in the alpha channel; premultiplication scales RGB
+ *   by alpha, destroying the distance field values. After creating a Pixi texture
+ *   for an MTSDF atlas, set: texture.source.alphaMode = 'no-premultiply-alpha'
+ *   MSDF (3-channel) atlases are unaffected since their alpha is always 1.0.
+ *
  * STANDALONE USAGE:
  *   Provide identity matrices for GlobalUniforms and LocalUniforms (uTransformMatrix),
  *   and positions in clip-space (-1 to 1).
