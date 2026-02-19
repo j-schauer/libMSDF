@@ -1,20 +1,5 @@
 <!DOCTYPE html>
 <!--
-  TODO: Fix pixi app init - missing DPI/resolution settings.
-  Correct pixi init (from himax/src/himax/App.ts):
-
-    await app.init({
-        preference: 'webgpu',
-        backgroundColor: 0x000000,
-        autoDensity: true,
-        resolution: 2,
-        powerPreference: 'high-performance',
-        antialias: true
-    });
-
-  Currently missing: autoDensity, resolution, powerPreference, antialias.
--->
-<!--
   CRITICAL: This is the shader test harness. It visually verifies the MSDF shaders
   are rendering correctly across WebGL2, raw WebGPU, and Pixi WebGPU. Do not remove.
 
@@ -362,7 +347,8 @@
         // ===================== WebGPU Renderer =====================
         // Uses Pixi-compatible binding layout:
         //   @group(0) - GlobalUniforms (identity matrices for standalone)
-        //   @group(1) - Custom uniforms, texture, sampler
+        //   @group(1) - LocalUniforms (identity transform for standalone)
+        //   @group(2) - Custom uniforms, texture, sampler
         class WebGPURenderer {
             constructor(canvas) {
                 this.canvas = canvas;
@@ -371,11 +357,13 @@
                 this.pipeline = null;
                 this.textures = {};
                 this.globalUniformBuffer = null;  // @group(0) - Pixi GlobalUniforms
-                this.uniformBuffer = null;        // @group(1) - Custom uniforms
+                this.localUniformBuffer = null;   // @group(1) - Pixi LocalUniforms
+                this.uniformBuffer = null;        // @group(2) - Custom uniforms
                 this.vertexBuffer = null;
                 this.uvBuffers = {};
                 this.globalBindGroup = null;      // @group(0)
-                this.customBindGroups = {};       // @group(1) per texture
+                this.localBindGroup = null;       // @group(1)
+                this.customBindGroups = {};       // @group(2) per texture
                 this.samplers = {};
             }
 
@@ -413,7 +401,24 @@
                 globalData[30] = 0; globalData[31] = 0;
                 this.device.queue.writeBuffer(this.globalUniformBuffer, 0, globalData);
 
-                // @group(1): Custom uniforms
+                // @group(1): LocalUniforms - per-mesh transform (identity for standalone)
+                // Layout: mat3x3f (48) + vec4f (16) + f32 (4) + padding (12) = 80 bytes
+                this.localUniformBuffer = this.device.createBuffer({
+                    size: 80,
+                    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
+                });
+                const localData = new Float32Array(20);
+                // uTransformMatrix - identity (column-major, padded to vec4f per column)
+                localData[0] = 1; localData[1] = 0; localData[2] = 0; localData[3] = 0;
+                localData[4] = 0; localData[5] = 1; localData[6] = 0; localData[7] = 0;
+                localData[8] = 0; localData[9] = 0; localData[10] = 1; localData[11] = 0;
+                // uColor
+                localData[12] = 1; localData[13] = 1; localData[14] = 1; localData[15] = 1;
+                // uRound + padding
+                localData[16] = 0; localData[17] = 0; localData[18] = 0; localData[19] = 0;
+                this.device.queue.writeBuffer(this.localUniformBuffer, 0, localData);
+
+                // @group(2): Custom uniforms
                 this.uniformBuffer = this.device.createBuffer({
                     size: 256,
                     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
@@ -448,7 +453,14 @@
                     ]
                 });
 
-                // Bind group layout for @group(1) - Custom uniforms + texture + sampler
+                // Bind group layout for @group(1) - LocalUniforms
+                const localBindGroupLayout = this.device.createBindGroupLayout({
+                    entries: [
+                        { binding: 0, visibility: GPUShaderStage.VERTEX, buffer: { type: 'uniform' } }
+                    ]
+                });
+
+                // Bind group layout for @group(2) - Custom uniforms + texture + sampler
                 const customBindGroupLayout = this.device.createBindGroupLayout({
                     entries: [
                         { binding: 0, visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' } },
@@ -458,7 +470,7 @@
                 });
 
                 const pipelineLayout = this.device.createPipelineLayout({
-                    bindGroupLayouts: [globalBindGroupLayout, customBindGroupLayout]
+                    bindGroupLayouts: [globalBindGroupLayout, localBindGroupLayout, customBindGroupLayout]
                 });
 
                 this.pipeline = this.device.createRenderPipeline({
@@ -488,6 +500,14 @@
                     layout: globalBindGroupLayout,
                     entries: [
                         { binding: 0, resource: { buffer: this.globalUniformBuffer } }
+                    ]
+                });
+
+                // Create local bind group (@group(1))
+                this.localBindGroup = this.device.createBindGroup({
+                    layout: localBindGroupLayout,
+                    entries: [
+                        { binding: 0, resource: { buffer: this.localUniformBuffer } }
                     ]
                 });
 
@@ -524,7 +544,7 @@
                     usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
                 });
 
-                // Custom bind group (@group(1)) for this texture
+                // Custom bind group (@group(2)) for this texture
                 this.customBindGroups[type] = this.device.createBindGroup({
                     layout: this.customBindGroupLayout,
                     entries: [
@@ -549,7 +569,7 @@
                 const f32 = new Float32Array(uniforms);
                 const i32 = new Int32Array(uniforms);
 
-                // Pack uniforms to match WGSL Uniforms struct (@group(1))
+                // Pack uniforms to match WGSL Uniforms struct (@group(2))
                 // uColor removed - now a per-vertex attribute
                 f32[0] = 1; f32[1] = 0; f32[2] = 1; f32[3] = 1;  // debugColor
                 f32[4] = cx; f32[5] = cy; f32[6] = state.size; f32[7] = state.size;  // viewport
@@ -589,7 +609,8 @@
 
                 renderPass.setPipeline(this.pipeline);
                 renderPass.setBindGroup(0, this.globalBindGroup);           // @group(0) - GlobalUniforms
-                renderPass.setBindGroup(1, this.customBindGroups[currentAtlas]);  // @group(1) - Custom
+                renderPass.setBindGroup(1, this.localBindGroup);              // @group(1) - LocalUniforms
+                renderPass.setBindGroup(2, this.customBindGroups[currentAtlas]);  // @group(2) - Custom
                 renderPass.setVertexBuffer(0, this.vertexBuffer);
                 renderPass.setVertexBuffer(1, this.uvBuffers[currentAtlas]);
                 renderPass.setVertexBuffer(2, this.colorBuffer);
@@ -628,7 +649,11 @@
                     height: this.canvas.height,
                     preference: 'webgpu',
                     backgroundColor: 0x000000,
-                    clearBeforeRender: true
+                    clearBeforeRender: true,
+                    autoDensity: true,
+                    resolution: 2,
+                    powerPreference: 'high-performance',
+                    antialias: true
                 });
 
                 if (this.app.renderer.type !== PIXI.RendererType.WEBGPU) {
@@ -641,7 +666,20 @@
                 indicator.fill(0x00ff00);
                 this.app.stage.addChild(indicator);
 
-                log('Pixi WebGPU initialized (green square = Pixi working)');
+                // Offset container to test that local transforms propagate to custom shader.
+                // The mesh renders at (0,0) inside this container; if the shader respects
+                // LocalUniforms.uTransformMatrix, the glyph appears at (100, 50) on screen.
+                // If the shader ignores local transforms, it appears at (0, 0).
+                this.offsetContainer = new PIXI.Container();
+                this.offsetContainer.x = 100;
+                this.offsetContainer.y = 50;
+                this.app.stage.addChild(this.offsetContainer);
+
+                // Reference rect inside the container — should align with the mesh
+                this.refRect = new PIXI.Graphics();
+                this.offsetContainer.addChild(this.refRect);
+
+                log('Pixi WebGPU initialized (green sq = Pixi, magenta rect = transform test)');
             }
 
             async loadTexture(type, img) {
@@ -653,7 +691,7 @@
             updateUVs(u0, v0, u1, v1) {
                 // Recreate mesh with new UVs
                 if (this.mesh) {
-                    this.app.stage.removeChild(this.mesh);
+                    this.offsetContainer.removeChild(this.mesh);
                     this.mesh.destroy();
                     this.mesh = null;
                 }
@@ -661,17 +699,15 @@
                 const texture = this.textures[currentAtlas];
                 if (!texture) return;
 
-                // Create geometry - quad with positions and UVs
-                // Positions in pixels, will be transformed by Pixi
+                // Positions are local to the offset container (0,0 to size,size).
+                // The container at (100, 50) provides the screen offset via LocalUniforms.
                 const size = state.size;
-                const cx = (this.canvas.width - size) / 2;
-                const cy = (this.canvas.height - size) / 2;
 
                 const positions = new Float32Array([
-                    cx, cy,           // TL
-                    cx + size, cy,    // TR
-                    cx + size, cy + size,  // BR
-                    cx, cy + size     // BL
+                    0, 0,           // TL
+                    size, 0,        // TR
+                    size, size,     // BR
+                    0, size         // BL
                 ]);
 
                 // UVs - note V is flipped for Pixi
@@ -701,11 +737,16 @@
                     indexBuffer: indices
                 });
 
-                // Uniforms must match the struct order in msdfWGSL (uColor removed)
+                // Redraw reference rect to match current glyph size
+                this.refRect.clear();
+                this.refRect.rect(0, 0, size, size);
+                this.refRect.stroke({ color: 0xff00ff, width: 2 });
+
+                // Uniforms
                 const json = jsons[currentAtlas];
                 this.uniforms = new PIXI.UniformGroup({
                     uDebugColor: { value: [1.0, 0.0, 1.0, 1.0], type: 'vec4<f32>' },
-                    uViewport: { value: [cx, cy, size, size], type: 'vec4<f32>' },
+                    uViewport: { value: [0, 0, size, size], type: 'vec4<f32>' },
                     uOutlineColor: { value: state.outlineColor, type: 'vec4<f32>' },
                     uGlowColor: { value: state.glowColor, type: 'vec4<f32>' },
                     uGlowOffset: { value: [state.glowOffsetX, state.glowOffsetY], type: 'vec2<f32>' },
@@ -743,13 +784,13 @@
                     }
                 });
 
-                // Create mesh
+                // Create mesh inside offset container to test local transform propagation
                 this.mesh = new PIXI.Mesh({
                     geometry: this.geometry,
                     shader: this.shader
                 });
 
-                this.app.stage.addChild(this.mesh);
+                this.offsetContainer.addChild(this.mesh);
             }
 
             draw() {
@@ -790,6 +831,11 @@
                 if (this.mesh) {
                     this.mesh.destroy();
                     this.mesh = null;
+                }
+                if (this.offsetContainer) {
+                    this.offsetContainer.destroy({ children: true });
+                    this.offsetContainer = null;
+                    this.refRect = null;
                 }
                 if (this.app) {
                     this.app.destroy(false);  // Don't remove canvas
