@@ -255,6 +255,50 @@ interface VariationAxis {
 }
 ```
 
+## Shader (shader.js)
+
+`shader.js` is the authoritative MSDF rendering shader for the libMSDF pipeline. It ships as part of the release and is imported directly by consumers. Any shader modifications should be made here in libMSDF.
+
+Exports three string constants:
+
+| Export | Language | Usage |
+|--------|----------|-------|
+| `msdfVertGLSL` | GLSL (WebGL2) | Vertex shader |
+| `msdfFragGLSL` | GLSL (WebGL2) | Fragment shader |
+| `msdfWGSL` | WGSL (WebGPU) | Combined vertex + fragment |
+
+```typescript
+import { msdfVertGLSL, msdfFragGLSL, msdfWGSL } from './shader.js';
+```
+
+### Vertex Attributes
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `aPosition` | vec2 | Quad vertex position |
+| `aUV` | vec2 | Texture coordinates into the MSDF atlas |
+| `aColor` | vec4 | Per-vertex glyph color (RGBA) |
+
+Glyph color is provided as a per-vertex attribute rather than a uniform. This enables batch rendering of many glyphs with different colors in a single draw call. For each glyph quad, all 4 vertices should share the same color value.
+
+### Uniforms
+
+The shader accepts uniforms for rendering parameters and effects. Glyph color is **not** a uniform -- it is the `aColor` vertex attribute above.
+
+Key rendering uniforms: `uSmoothing`, `uWeight`, `uUseAlpha`, `uPxRange`, `uTexSize`.
+
+Effect uniforms (gated by `uFancyEnable`): outline (`uOutlineOnOff`, `uOutlineWidth`, `uOutlineColor`), glow (`uGlowOnOff`, `uGlowRadius`, `uGlowColor`, `uGlowAlpha`, `uGlowOffset`, `uGlowDiffusion`), blur (`uBlurOnOff`, `uCharBlur`).
+
+Debug uniforms: `uDebugMode` (0=normal, 1=solid fill, 2=X pattern, 3=raw texture), `uDebugColor`, `uViewport`.
+
+### Pixi.js v8 Integration
+
+The shaders are designed for Pixi.js v8 (WebGL2 + WebGPU):
+- **WebGL2**: Pixi auto-injects `uProjectionMatrix` and `uWorldTransformMatrix`
+- **WebGPU**: Pixi owns `@group(0)` for GlobalUniforms; custom bindings go to `@group(1)`
+
+For standalone use, bind identity `mat3` matrices and provide positions in clip-space.
+
 ## WASM Exports (low-level)
 
 The raw C functions exported from the WASM module. Use `MSDFGenerator` instead -- these require manual WASM heap management.

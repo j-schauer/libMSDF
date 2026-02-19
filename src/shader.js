@@ -1,8 +1,31 @@
 /*
  * MSDF Shaders - Pixi.js v8 Compatible
  *
+ * Authoritative MSDF rendering shaders for the libMSDF pipeline. Any shader
+ * changes should be made here in libMSDF and consumed downstream.
+ *
  * These shaders are designed to work with Pixi.js v8 (WebGL2 + WebGPU) but can
  * also be used standalone by providing identity matrices for GlobalUniforms.
+ *
+ * EXPORTS:
+ *   msdfVertGLSL  - GLSL vertex shader (WebGL2)
+ *   msdfFragGLSL  - GLSL fragment shader (WebGL2)
+ *   msdfWGSL      - Combined WGSL shader (WebGPU)
+ *
+ * VERTEX ATTRIBUTES:
+ *   aPosition (vec2)  - Quad vertex position
+ *   aUV       (vec2)  - Texture coordinates into the MSDF atlas
+ *   aColor    (vec4)  - Per-vertex glyph color (RGBA). Enables batch rendering
+ *                       of multiple glyphs with different colors in one draw call.
+ *                       For a single glyph quad, set all 4 vertices to the same color.
+ *
+ * UNIFORMS (all via uniform block, no per-glyph color uniform):
+ *   uSmoothing, uWeight, uUseAlpha, uPxRange, uTexSize - MSDF rendering params
+ *   uFancyEnable - Enables outline/glow/blur effects (fast path when off)
+ *   uOutlineOnOff, uOutlineWidth, uOutlineColor - Outline effect
+ *   uGlowOnOff, uGlowRadius, uGlowColor, uGlowAlpha, uGlowOffset, uGlowDiffusion - Glow
+ *   uBlurOnOff, uCharBlur - Character blur
+ *   uDebugMode, uDebugColor, uViewport - Debug visualization modes
  *
  * PIXI BINDING REQUIREMENTS:
  *   WebGL:  Pixi auto-injects uProjectionMatrix, uWorldTransformMatrix uniforms
@@ -16,6 +39,8 @@
 // =============================================================================
 // GLSL VERTEX SHADER (WebGL2)
 // =============================================================================
+// Inputs: aPosition (vec2), aUV (vec2), aColor (vec4)
+// Outputs: vTexcoord (vec2), vColor (vec4) passed to fragment shader
 // Pixi provides uProjectionMatrix and uWorldTransformMatrix automatically.
 // For standalone use, bind identity mat3 uniforms.
 
@@ -44,6 +69,7 @@ void main() {
 // =============================================================================
 // GLSL FRAGMENT SHADER (WebGL2)
 // =============================================================================
+// Receives vColor (vec4) from vertex shader for per-glyph coloring.
 // Works with both Pixi and standalone - no Pixi-specific requirements.
 
 export const msdfFragGLSL = `#version 300 es
@@ -207,6 +233,11 @@ void main() {
 // =============================================================================
 // WGSL SHADER (WebGPU) - Pixi.js v8 Compatible
 // =============================================================================
+//
+// VERTEX INPUTS:
+//   @location(0) aPosition: vec2f
+//   @location(1) aUV: vec2f
+//   @location(2) aColor: vec4f  - per-vertex glyph color
 //
 // BINDING LAYOUT:
 //   @group(0) - Pixi's GlobalUniforms (projection, world transform)
