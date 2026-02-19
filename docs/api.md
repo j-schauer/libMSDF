@@ -295,9 +295,9 @@ Debug uniforms: `uDebugMode` (0=normal, 1=solid fill, 2=X pattern, 3=raw texture
 
 The shaders are designed for Pixi.js v8 (WebGL2 + WebGPU):
 - **WebGL2**: Pixi auto-injects `uProjectionMatrix` and `uWorldTransformMatrix`
-- **WebGPU**: Pixi owns `@group(0)` for GlobalUniforms; custom bindings go to `@group(1)`
+- **WebGPU**: `@group(0)` GlobalUniforms (projection + stage transform), `@group(1)` LocalUniforms (per-mesh transform carrying parent container offsets), `@group(2)` custom MSDF uniforms + texture + sampler. Pixi auto-binds groups 0 and 1.
 
-For standalone use, bind identity `mat3` matrices and provide positions in clip-space.
+For standalone use, bind identity matrices for all three groups and provide positions in clip-space.
 
 ## WASM Exports (low-level)
 

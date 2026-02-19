@@ -29,10 +29,11 @@
  *
  * PIXI BINDING REQUIREMENTS:
  *   WebGL:  Pixi auto-injects uProjectionMatrix, uWorldTransformMatrix uniforms
- *   WebGPU: Pixi owns @group(0) for GlobalUniforms, custom bindings go to @group(1)
+ *   WebGPU: @group(0) GlobalUniforms, @group(1) LocalUniforms (per-mesh transform),
+ *           @group(2) custom uniforms + texture + sampler
  *
  * STANDALONE USAGE:
- *   Provide identity matrices for uProjectionMatrix/uWorldTransformMatrix
+ *   Provide identity matrices for GlobalUniforms and LocalUniforms (uTransformMatrix),
  *   and positions in clip-space (-1 to 1).
  */
 
@@ -241,12 +242,13 @@ void main() {
 //
 // BINDING LAYOUT:
 //   @group(0) - Pixi's GlobalUniforms (projection, world transform)
-//   @group(1) - Custom uniforms, texture, sampler
+//   @group(1) - Pixi's LocalUniforms (per-mesh transform matrix)
+//   @group(2) - Custom uniforms, texture, sampler
 //
 // PIXI USAGE:
 //   - Resource names must match WGSL var names: "u", "uTexture", "uSampler"
 //   - Inline @location attributes with trailing comma (parser bug #11819 workaround)
-//   - Pixi provides GlobalUniforms automatically - no setup needed
+//   - Pixi auto-binds GlobalUniforms (@group(0)) and LocalUniforms (@group(1))
 
 export const msdfWGSL = `
 // Pixi v8 Global Uniforms - auto-bound by Pixi at @group(0)
@@ -259,7 +261,16 @@ struct GlobalUniforms {
 
 @group(0) @binding(0) var<uniform> globalUniforms: GlobalUniforms;
 
-// Custom uniforms - @group(1), provided via resources
+// Pixi v8 Local Uniforms - auto-bound at @group(1), carries per-mesh world transform
+struct LocalUniforms {
+    uTransformMatrix: mat3x3f,
+    uColor: vec4f,
+    uRound: f32,
+}
+
+@group(1) @binding(0) var<uniform> localUniforms: LocalUniforms;
+
+// Custom uniforms - @group(2), provided via resources
 struct Uniforms {
     uDebugColor: vec4f,
     uViewport: vec4f,
@@ -285,9 +296,9 @@ struct Uniforms {
     _pad: vec3f,
 }
 
-@group(1) @binding(0) var<uniform> u: Uniforms;
-@group(1) @binding(1) var uTexture: texture_2d<f32>;
-@group(1) @binding(2) var uSampler: sampler;
+@group(2) @binding(0) var<uniform> u: Uniforms;
+@group(2) @binding(1) var uTexture: texture_2d<f32>;
+@group(2) @binding(2) var uSampler: sampler;
 
 struct VertexOutput {
     @builtin(position) position: vec4f,
@@ -304,8 +315,8 @@ fn vs_main(
 ) -> VertexOutput {
     var out: VertexOutput;
 
-    // Use Pixi's projection and world transform (both from group 0)
-    let mvp = globalUniforms.uProjectionMatrix * globalUniforms.uWorldTransformMatrix;
+    // Transform: projection * world * local (local carries per-mesh parent transforms)
+    let mvp = globalUniforms.uProjectionMatrix * globalUniforms.uWorldTransformMatrix * localUniforms.uTransformMatrix;
     let clip = mvp * vec3f(aPosition, 1.0);
     out.position = vec4f(clip.xy, 0.0, 1.0);
     out.vTexcoord = aUV;
